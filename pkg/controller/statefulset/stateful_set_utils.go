@@ -132,6 +132,20 @@ func storageMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
 	return true
 }
 
+// imageMatches returns true if pod's image is the same with StatefulSet's image
+func imageMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
+	for _, cs := range set.Spec.Template.Spec.Containers {
+		for _, cp := range pod.Spec.Containers {
+			if cs.Name == cp.Name {
+				if cs.Image != cp.Image {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
 // getPersistentVolumeClaims gets a map of PersistentVolumeClaims to their template names, as defined in set. The
 // returned PersistentVolumeClaims are each constructed with a the name specific to the Pod. This name is determined
 // by getPersistentVolumeClaimName.
@@ -197,6 +211,19 @@ func updateIdentity(set *apps.StatefulSet, pod *v1.Pod) {
 		pod.Labels = make(map[string]string)
 	}
 	pod.Labels[apps.StatefulSetPodNameLabel] = pod.Name
+}
+
+// updateImage updates pod's image to conform to set's image
+func updateImage(set *apps.StatefulSet, pod *v1.Pod) {
+	for si, sc := range set.Spec.Template.Spec.Containers {
+		for pi, pc := range pod.Spec.Containers {
+			if sc.Name == pc.Name {
+				if sc.Image != pc.Image {
+					pod.Spec.Containers[pi].Image = set.Spec.Template.Spec.Containers[si].Image
+				}
+			}
+		}
+	}
 }
 
 // isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady.

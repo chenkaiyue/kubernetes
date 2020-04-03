@@ -452,7 +452,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			return &status, nil
 		}
 		// Enforce the StatefulSet invariants
-		if identityMatches(set, replicas[i]) && storageMatches(set, replicas[i]) {
+		if identityMatches(set, replicas[i]) && storageMatches(set, replicas[i]) && imageMatches(set, replicas[i]) {
 			continue
 		}
 		// Make a deep copy so we don't mutate the shared cache
