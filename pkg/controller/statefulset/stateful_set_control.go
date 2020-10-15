@@ -17,6 +17,7 @@ limitations under the License.
 package statefulset
 
 import (
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"math"
 	"sort"
 
@@ -444,6 +445,33 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		// We must ensure that all for each Pod, when we create it, all of its predecessors, with respect to its
 		// ordinal, are Running and Ready.
 		if !isRunningAndReady(replicas[i]) && monotonic {
+			for _, cs := range replicas[i].Status.ContainerStatuses {
+				if cs.State.Waiting != nil {
+					if cs.State.Waiting.Reason == images.ErrImagePullBackOff.Error() {
+						ssc.recorder.Eventf(set, v1.EventTypeWarning, "PodErrImagePullBackOff",
+							"StatefulSet %s/%s Pod %s ErrImagePullBackOff",
+							set.Namespace,
+							set.Name,
+							replicas[i].Name)
+						if err := ssc.podControl.DeleteStatefulPod(set, replicas[i]); err != nil {
+							return &status, err
+						}
+						if getPodRevision(replicas[i]) == currentRevision.Name {
+							status.CurrentReplicas--
+						}
+						if getPodRevision(replicas[i]) == updateRevision.Name {
+							status.UpdatedReplicas--
+						}
+						status.Replicas--
+						replicas[i] = newVersionedStatefulSetPod(
+							currentSet,
+							updateSet,
+							currentRevision.Name,
+							updateRevision.Name,
+							i)
+					}
+				}
+			}
 			klog.V(4).Infof(
 				"StatefulSet %s/%s is waiting for Pod %s to be Running and Ready",
 				set.Namespace,
